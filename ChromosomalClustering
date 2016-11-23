@@ -1,0 +1,306 @@
+# Used to solve homothety problems in hotspot localization
+# Input.tabtxt ORDERED BY THEIR GENOMIC POSITION   col1: order on genome, cole2=name ,  col3=chromosome col4:Position on chromosom col5:1 or 0  (DE or not?, expressed or not?)
+# Unique names
+
+rm(list=ls(all=TRUE))
+library(calibrate);library(fdrtool);library(audio);library(TeachingDemos);Input=0;Input.sav=0
+options(stringsAsFactors = FALSE);options(warn=-1)
+setwd("C:\\Users\\Dash\\Desktop\\lnc+coding_upanddown\\7")
+par(ask= FALSE );par(lab=c(50,10,7));par(xaxs="i")
+Input=read.table("Input.tabtxt",sep='\t', header=TRUE)
+Input[,5]=abs(Input[,5]);Input=Input[order(Input[,1]),];Input[,4]<-paste(Input[,3],Input[,4],sep=":"); Input[,1]=seq(1:  dim(Input)[1]); Input[,3]=as.factor(Input[,3]);Input[,6]=0; Input[,2]<-as.character(Input[,2]);Input.sav=Input;if(anyDuplicated(Input[,2])!=0){print("Duplicate found");wait(NA)};length.Input=dim(Input)[1];Levels.Input<-levels(Input[,3])
+if(anyDuplicated(Input[,2])!=0){quit(save="no")}
+Name_Analyzis="CodingAndLncUpOrDown"
+OnlyDynamicBin= TRUE
+perChromosome= TRUE
+perChromosomeOnTheChromosome =  FALSE
+ForceMaxNumberOfLabels = FALSE
+MaxHotSpots = 0
+Auto_Max_Bin= TRUE
+Max_Bin = 40
+Zvalue_min= 0
+min_bin_difference= 2
+IterationsOfBinomialDistributions= 1000
+ComputHospot= TRUE
+PlotLocalization= FALSE
+PlotHotSpots= TRUE
+GeneNameIsBed=TRUE
+TaillePolice = 1.25
+type_Graphe="h"
+bin= 17
+PNG_WidthRestrictedByChromosomeLength= FALSE
+pVThresold=0.05; CumulativeLOGFDR=10; offset=0;temp2_previous=0;O_ChrForText_previous=FALSE;ads="";Max_BinomeDistrib=0;Max_BinomeDistrib95=0;Max_BinomeDistrib90=0;FAKEDISTRIB=FALSE
+# Functions
+is.outlier<-function (x) {    lims <- median(x) + c(-1, 1) * 5.2 * mad(x, constant = 1);    x < lims[1] | x > lims[2]}   
+F.plot.bins<-function()
+{
+if(Auto_Max_Bin){Max_Bin=round((dim(Input)[1])/5,0);if(Max_Bin>100){Max_Bin=100}}
+Output=Input[1,];Output=Output[-1]
+Input=Input[order(Input[,1]),]; Input[,1]=seq(1:  dim(Input)[1]); Input[,3]=as.factor(Input[,3]);Input[,6]=0; Input[,2]<-as.character(Input[,2]);length.Input=dim(Input)[1];Levels.Input<-levels(Input[,3]);Output.WOBIGPV=Output[1,];Output.WOBIGPV=Output.WOBIGPV[-1,]
+if(OnlyDynamicBin!=TRUE)
+{
+Nb.Of.Bins=floor(length.Input/bin);Millieu.bin=round(bin/2);Output=Input[1:Nb.Of.Bins,];print(paste("Computing expressions for FIXED bin=", bin))
+temp=seq(Millieu.bin,length.Input,by=bin);temp<-temp[1:Nb.Of.Bins];Output[,1:4]=Input[temp,1:4];Output[,5]=rowSums(matrix(Input[,5],ncol=bin,byrow=TRUE))[1:Nb.Of.Bins]
+Output.WO0=Output[1,];Output.WO0=Output.WO0[-1,];Output.WO0<-Output[Output[,5]!=0,]
+if( sd(Output.WO0[,5])!=0){  temp=which(is.outlier(Output.WO0[,5]));Output.WOBIGPV<-Output.WO0[temp,];Output.WOBIGPV[,6]=abs(z.test(alternative="l",Output.WO0[,5],mu=Output.WOBIGPV[,5],sd=sd(Output.WO0[,5]))$statistic)}
+plot(Output[,5],type=type_Graphe,main=paste(Name_Analyzis,ads, "FixedBin=",bin))
+if(dim(Output.WOBIGPV)[1]!=0){for (i in 1:dim(Output.WOBIGPV)[1]){ text(Output.WOBIGPV[i,1]/bin,Output.WOBIGPV[i,5],labels=Output.WOBIGPV[i,2],cex= TaillePolice,pos=3)}}
+for (i in 1 : dim(Input)[1]){segments(par()$usr[2]*(Input[i,1]/max(Input[,1])),0,par()$usr[2]*(Input[i,1]/max(Input[,1])),Input[i,5]*par()$usr[3])}
+if(PNG_WidthRestrictedByChromosomeLength){png(paste(Name_Analyzis,ads,"FixedBin",bin,".png"),width = length(Input[,5]), height = 1080)}else{png(paste(Name_Analyzis,ads,"FixedBin",bin,".png"),width = 1920, height = 1080)}
+
+plot(Output[,5],type=type_Graphe,main=paste(Name_Analyzis,ads, "FixedBin=",bin))
+if(dim(Output.WOBIGPV)[1]!=0){for (i in 1:dim(Output.WOBIGPV)[1]){ text(Output.WOBIGPV[i,1]/bin,Output.WOBIGPV[i,5],labels=Output.WOBIGPV[i,2],cex= TaillePolice,pos=3)}}
+for (i in 1 : dim(Input)[1]){segments(par()$usr[2]*(Input[i,1]/max(Input[,1])),0,par()$usr[2]*(Input[i,1]/max(Input[,1])),Input[i,5]*par()$usr[3])}
+dev.off()
+Output=Input;Output=Output[-(1:(Millieu.bin-1)),]
+for (i in 1:(length.Input-Millieu.bin)){Output[i,5]=sum(Input[(i):((i)+bin),5])}
+Output=Output[-((length.Input-2*Millieu.bin+1):(length.Input-Millieu.bin+1)),]
+plot(Output[,5],type=type_Graphe,main=paste(Name_Analyzis, ads,"ContinuousBins_bin=",bin));print(paste(ads,"Bin=",bin,"  Computing pValue", sep=""))
+Output[,2]=as.numeric(Output[,2]);colnames(Output)[3:4]=c("pValue","FDR")
+for (i in 1 : dim(Input)[1]){segments(par()$usr[2]*(Input[i,1]/max(Input[,1])),0,par()$usr[2]*(Input[i,1]/max(Input[,1])),Input[i,5]*par()$usr[3])}
+if(PNG_WidthRestrictedByChromosomeLength){png(paste(Name_Analyzis,ads,"ContinuousBin",bin,".png"),width = length(Input[,5]), height = 1080)}else{png(paste(Name_Analyzis,ads,"ContinuousBin",bin,".png"),width = 1920, height = 1080)}
+
+plot(Output[,5],type=type_Graphe,main=paste(Name_Analyzis,ads, "ContinuousBins_bin=",bin));print(paste(ads,"Bin=",bin,"  Computing pValue", sep=""))
+Output[,2]=as.numeric(Output[,2]);colnames(Output)[3:4]=c("pValue","FDR")
+for (i in 1 : dim(Input)[1]){segments(i,0,i,Input[i,5]*par()$usr[3])}
+dev.off()
+}
+print(paste(ads,"[Dynamic Binning]"))
+plot (Input[,5],main=(ads));wait(1)
+Input[,6]=0;length.Input=dim(Input)[1]
+if(ComputHospot){
+for (i in 3:Max_Bin)
+{
+bin=i;Nb.Of.Bins=length.Input/bin-1;Millieu.bin=round(bin/2);Output=Input[1:Nb.Of.Bins,]
+print(i)
+for (offset in 0:(i-1))
+{
+temp=seq(Millieu.bin+offset,length.Input,by=bin);temp<-temp[1:Nb.Of.Bins];Output[,1:4]=Input[temp,1:4];Output[,5]=rowSums(matrix(Input[(1+offset):length.Input,5],ncol=bin,byrow=TRUE))[1:Nb.Of.Bins];if(!(max(Output[,5])-min(Output[,5]))>min_bin_difference){Output[,5]=0}
+Output.WO0=Output[1,];Output.WO0=Output.WO0[-1,];Output.WO0<-Output[Output[,5]!=0,]
+try(silent=TRUE,if( sd(Output.WO0[,5])!=0){  temp=which(is.outlier(Output.WO0[,5])); Output.WOBIGPV<- Output.WO0[temp,];Output.WOBIGPV[,6]=abs(z.test(alternative="g",Output.WO0[,5],mu=Output.WOBIGPV[,5],sd=sd(Output.WO0[,5]))$statistic);Output.WOBIGPV[    which(Output.WOBIGPV[,6]<Zvalue_min) ,6]=0;Input[Output.WOBIGPV[,1],6]=Output.WOBIGPV[,6]+Input[Output.WOBIGPV[,1],6]})
+}
+
+if(FAKEDISTRIB==FALSE){plot(Input[,6],type=type_Graphe,main=paste(Name_Analyzis,ads),xlab="",ylab="",col="blue")}
+
+}
+}
+if((max(Input[,6])>=Max_BinomeDistrib90)&(FAKEDISTRIB==FALSE))
+{
+Input[,7]=FALSE;Input[,8]=Input[,6]
+if(PlotLocalization){
+par(ask= FALSE );par(lab=c(50,10,7));par(xaxs="i")
+plot(Input[,6],type=type_Graphe,main=paste("Localization for MaxBin",   Max_Bin," ",Name_Analyzis,ads,sep=""),xlab="",ylab="",col="light grey")
+for (i in 1 : dim(Input)[1]){segments(i,0,i,Input[i,5]*par()$usr[3])}
+temp2=which(Input[,5]>0.5)
+temp=runif(length(temp2),0,par()$usr[4])
+text(Input[temp2,1],temp,Input[temp2,4],cex= TaillePolice,pos=3,offset=0)
+segments(Input[temp2,1],0,Input[temp2,1],temp,col="light blue",lty=3)
+if(IterationsOfBinomialDistributions>0){segments(0,Max_BinomeDistrib95,length(Input[,5]),Max_BinomeDistrib95,col="Red");segments(0,Max_BinomeDistrib90,length(Input[,5]),Max_BinomeDistrib90,col="magenta"); text(length(Input[,5]),Max_BinomeDistrib95,paste("95%_",IterationsOfBinomialDistributions,"it                   ",sep=""),pos=c(3),col="red"); text(length(Input[,5]),Max_BinomeDistrib90,paste("90%_",IterationsOfBinomialDistributions,"it                   ",sep=""),pos=c(3),col="magenta")}
+if(PNG_WidthRestrictedByChromosomeLength){png(paste(Name_Analyzis,ads,sep=""," ","Localization, MaxBin",   Max_Bin,".png"),width =length(Input[,5]), height = 1080)}else{png(paste(Name_Analyzis,ads,sep=""," ","Localization, MaxBin",   Max_Bin,".png"),width = 1920, height = 1080)}
+
+par(ask= FALSE );par(lab=c(50,10,7));par(xaxs="i")
+plot(Input[,6],type=type_Graphe,main=paste("Localization for MaxBin",   Max_Bin," ",Name_Analyzis,ads,sep=""),xlab="",ylab="",col="light grey")
+for (i in 1 : dim(Input)[1]){segments(i,0,i,Input[i,5]*par()$usr[3])}
+temp2=which(Input[,5]>0.5)
+temp=runif(length(temp2),0,par()$usr[4])
+text(Input[temp2,1],temp,Input[temp2,4],cex= TaillePolice,pos=3,offset=0)
+segments(Input[temp2,1],0,Input[temp2,1],temp,col="light blue",lty=3)
+dev.off()
+}
+if(PlotHotSpots){
+plot(Input[,6],type=type_Graphe,main=paste("for MaxBin",   Max_Bin," ",Name_Analyzis,ads,sep=""),xlab="",ylab="",col="blue")
+if(IterationsOfBinomialDistributions>0){segments(0,Max_BinomeDistrib95,length(Input[,5]),Max_BinomeDistrib95,col="Red");segments(0,Max_BinomeDistrib90,length(Input[,5]),Max_BinomeDistrib90,col="magenta"); text(length(Input[,5]),Max_BinomeDistrib95,paste("95%_",IterationsOfBinomialDistributions,"it                   ",sep=""),pos=c(3),col="red"); text(length(Input[,5]),Max_BinomeDistrib90,paste("90%_",IterationsOfBinomialDistributions,"it                   ",sep=""),pos=c(3),col="magenta")}
+for (i in 1 : dim(Input)[1]){segments(i,0,i,Input[i,5]*par()$usr[3])}
+Input.WO0=Input[1,];Input.WO0=Input.WO0[-1,];Input.WO0<-Input[Input[,6]!=0,];med_Input.WO0= median(Input.WO0[,6])
+colnames(Input)[6:8]=c("Binned","text",paste("For:",sep="","MaxBin=",Max_Bin))
+bin_max_dyn=c(1,0,FALSE);Input[,7]=FALSE
+
+if (ForceMaxNumberOfLabels&(MaxHotSpots>0)){
+for (i in 2:length.Input)
+{
+if ((Input[i,6]>bin_max_dyn[2])&(bin_max_dyn[3]==TRUE))
+{
+
+Input[bin_max_dyn[1],7]=FALSE
+Input[i,7]=TRUE;bin_max_dyn[1]=i;bin_max_dyn[2]=Input[i,6];bin_max_dyn[3]=TRUE
+}
+if (Input[i,6]<Max_BinomeDistrib90/2){bin_max_dyn=c(1,0,FALSE)}
+if ((Input[i,6]>bin_max_dyn[2])&(bin_max_dyn[3]==FALSE)){Input[i,7]=TRUE;bin_max_dyn[1]=i;bin_max_dyn[2]=Input[i,6];bin_max_dyn[3]=TRUE}
+
+}
+ Input[which(Input[,6]<Max_BinomeDistrib90),7]=FALSE
+}
+Input.sav<-Input
+Input<-Input[order(Input[,8],decreasing=TRUE),]
+if (MaxHotSpots<dim(Input[which(Input[,7]),])[1])
+{
+temp=Input[which(Input[,7]),][,1][1:MaxHotSpots]
+Input<-Input[order(Input[,1]),]
+Input[,7]=FALSE
+Input[temp,7]=TRUE
+}
+Input<-Input[order(Input[,1]),]
+text_ok=which(Input[,7])
+temp=runif(length(text_ok),Input[text_ok,6],max(Input[text_ok,6]))
+if (!GeneNameIsBed) {try(text(Input[text_ok,1],temp,labels=Input[text_ok,2],cex= TaillePolice,pos=3,offset=0.6))}
+try(text(Input[text_ok,1],temp,labels=Input[text_ok,4],cex= TaillePolice,pos=3,offset=0))
+segments(Input[text_ok,1],Input[text_ok,6],Input[text_ok,1],temp,col="red",lty=2)
+
+if(PNG_WidthRestrictedByChromosomeLength){png(paste(Name_Analyzis,ads,sep=""," ","MaxBin",   Max_Bin,"_WR.png"),width = length(Input[,5]), height = 1080)}else{png(paste(Name_Analyzis,ads,sep=""," ","MaxBin",   Max_Bin,".png"),width = 1920, height = 1080)}
+par(ask= FALSE );par(lab=c(50,10,7));par(xaxs="i")
+plot(Input[,6],type=type_Graphe,main=paste(Name_Analyzis,ads," ",sep="","MaxBin",   Max_Bin),xlab="",ylab="",col="blue")
+if(IterationsOfBinomialDistributions>0){segments(0,Max_BinomeDistrib95,length(Input[,5]),Max_BinomeDistrib95,col="Red");segments(0,Max_BinomeDistrib90,length(Input[,5]),Max_BinomeDistrib90,col="magenta"); text(length(Input[,5]),Max_BinomeDistrib95,paste("95%_",IterationsOfBinomialDistributions,"it                   ",sep=""),pos=c(3),col="red"); text(length(Input[,5]),Max_BinomeDistrib90,paste("90%_",IterationsOfBinomialDistributions,"it                   ",sep=""),pos=c(3),col="magenta")}
+for (i in 1 : dim(Input)[1]){segments(i,0,i,Input[i,5]*par()$usr[3])}
+try(text(Input[text_ok,1],temp,labels=Input[text_ok,2],cex= TaillePolice,pos=3,offset=0.6))
+if (!GeneNameIsBed) { try(text(Input[text_ok,1],temp,labels=Input[text_ok,4],cex= TaillePolice,pos=3,offset=0))}
+segments(Input[text_ok,1],Input[text_ok,6],Input[text_ok,1],temp,col="red",lty=2)
+dev.off()
+Input<-Input[order(Input[,8],decreasing=TRUE),];Input[,8]=round(Input[,8],0)
+Input=cbind(Input,Input[,1],Input[,1],Input[,1]); Input[,9]=Name_Analyzis; Input[,10]=Max_BinomeDistrib90;Input[,11]=Max_BinomeDistrib95; colnames(Input)[9]<-     "NameAnalyzis";colnames(Input)[10]<-"90% Confidence"; colnames(Input)[11]<- "95% Confidence"
+write.table( file=paste("R_Output for MaxBin",   Max_Bin," ",Name_Analyzis,ads,".tabtxt",sep=""),row.names=FALSE,sep="\t" ,Input[which(Input[,7]),])
+Input<-Input.sav
+}
+}
+if((max(Input[,6])<Max_BinomeDistrib90)&(FAKEDISTRIB==FALSE)){
+
+par(ask= FALSE );par(lab=c(50,10,7));par(xaxs="i")
+plot(Input[,6],type=type_Graphe,main=paste("NO HOTSPOTS FOUND MaxBin",   Max_Bin," ",Name_Analyzis,ads,sep=""),xlab="",ylab="",col="blue")
+temp=runif(length(which(Input[,5]>0.51)),0,1)
+try(text(which(Input[,5]>0.5),temp,labels=Input[which(Input[,5]>0.5),2],cex= TaillePolice,pos=3,offset=0.6))
+if (!GeneNameIsBed) {try(text(which(Input[,5]>0.5),temp,labels=Input[which(Input[,5]>0.5),4],cex= TaillePolice,pos=3,offset=0))}
+for (i in 1 : dim(Input)[1]){segments(i,0,i,Input[i,5]*par()$usr[3])}
+segments(which(Input[,5]>0.5),0,which(Input[,5]>0.5),temp,col="red",lty=2)
+if(PNG_WidthRestrictedByChromosomeLength){png(paste("NO HOTSPOTS FOUND MaxBin",   Max_Bin," ",Name_Analyzis,ads,sep="",".png"),width = length(Input[,5]), height = 1080)}else{png(paste("NO HOTSPOTS FOUND MaxBin",   Max_Bin," ",Name_Analyzis,ads,sep="",".png"),width = 1920, height = 1080)}
+
+par(ask= FALSE );par(lab=c(50,10,7));par(xaxs="i")
+plot(Input[,6],type=type_Graphe,main=paste("NO HOTSPOTS FOUND MaxBin",   Max_Bin," ",Name_Analyzis,ads,sep=""),xlab="",ylab="",col="blue")
+temp=runif(length(which(Input[,5]>0.5)),0,1)
+try(text(which(Input[,5]>0.5),temp,labels=Input[which(Input[,5]>0.5),2],cex= TaillePolice,pos=3,offset=0.6))
+if (!GeneNameIsBed) {try(text(which(Input[,5]>0.5),temp,labels=Input[which(Input[,5]>0.5),4],cex= TaillePolice,pos=3,offset=0))}
+for (i in 1 : dim(Input)[1]){segments(i,0,i,Input[i,5]*par()$usr[3])}
+segments(which(Input[,5]>0.5),0,which(Input[,5]>0.5),temp,col="red",lty=2)
+dev.off()
+}
+write.table("",file=paste(Name_Analyzis,ads,"_",IterationsOfBinomialDistributions,"iters_",Max_BinomeDistrib90,"_90%_",Max_BinomeDistrib95,"_95%",sep=""))
+return(max(Input[,6]))
+}
+# Program START
+
+Max_BinomeDistrib95_ThresoldRanked=floor(IterationsOfBinomialDistributions*5/100)-1
+Max_BinomeDistrib90_ThresoldRanked=floor(IterationsOfBinomialDistributions*10/100)-1
+if(Max_BinomeDistrib95_ThresoldRanked<1){Max_BinomeDistrib95_ThresoldRanked=1}
+if(Max_BinomeDistrib90_ThresoldRanked<2){Max_BinomeDistrib90_ThresoldRanked=2}
+
+
+if(!perChromosome)
+{
+if( max(Input[,5])>0.5){
+Input.sav2<-Input
+Total_Length=length(Input[,5])
+Selected_Genes=length(which(Input[,5]>0.5))
+if(IterationsOfBinomialDistributions>0){
+for (DistribNumber in 1:IterationsOfBinomialDistributions)
+{
+FAKEDISTRIB=TRUE
+temp<-rnorm(Total_Length);temp2<-temp[order(-temp)];temp3=temp2[Selected_Genes+1]
+
+temp[which(temp<temp3)]=0;temp[which(temp>0)]=1
+BinomDistrib<-temp
+plot(BinomDistrib)
+
+Input[,5]<-BinomDistrib
+ads=paste("FAKEDISTRIB_Number",DistribNumber)
+
+Input[,5]<-Input[,5]+rep(c(0,0.0000001,0.000000001),(length(Input[,5])/3));Input[,5]<-Input[,5]/max(Input[,5])
+Max_BinomeDistrib=c(Max_BinomeDistrib,F.plot.bins())
+print(paste("DistribNumber ",DistribNumber ))
+}
+Max_BinomeDistrib<-Max_BinomeDistrib[order(Max_BinomeDistrib)];Max_BinomeDistrib=Max_BinomeDistrib[-1];Max_BinomeDistrib<-Max_BinomeDistrib[order(-Max_BinomeDistrib)]
+Max_BinomeDistrib95=Max_BinomeDistrib[Max_BinomeDistrib95_ThresoldRanked];Max_BinomeDistrib90=Max_BinomeDistrib[Max_BinomeDistrib90_ThresoldRanked]
+FAKEDISTRIB=FALSE
+Input<-Input.sav2
+}
+}
+Input[,5]<-Input[,5]+rep(c(0,0.0000001,0.000000001),(length(Input[,5])/3));Input[,5]<-Input[,5]/max(Input[,5])
+ads=" AllGenome"
+F.plot.bins()
+}
+if(perChromosome)
+{
+if(perChromosomeOnTheChromosome==FALSE){
+for (i_Chrom in 1 : (length(Levels.Input)))
+{
+Max_BinomeDistrib=0;Max_BinomeDistrib95=0;Max_BinomeDistrib90=0
+print(paste("Parsing chromosome",Levels.Input[i_Chrom]))
+ads=paste("_Chr",Levels.Input[i_Chrom],sep="")
+Input=Input.sav[Input.sav[,3]==Levels.Input[i_Chrom],]
+if( max(Input[,5])>0.5){
+Input.sav2<-Input
+Total_Length=length(Input[,5])
+Selected_Genes=length(which(Input[,5]>0.5))
+if(IterationsOfBinomialDistributions>0){
+for (DistribNumber in 1:IterationsOfBinomialDistributions)
+{
+FAKEDISTRIB=TRUE
+temp<-rnorm(Total_Length);temp2<-temp[order(-temp)];temp3=temp2[Selected_Genes+1]
+
+temp[which(temp<temp3)]=0;temp[which(temp>0)]=1
+BinomDistrib<-temp
+plot(BinomDistrib)
+
+Input[,5]<-BinomDistrib
+ads=paste("FAKEDISTRIB_Number",DistribNumber)
+
+Input[,5]<-Input[,5]+rep(c(0,0.0000001,0.000000001),(length(Input[,5])/3));Input[,5]<-Input[,5]/max(Input[,5])
+Max_BinomeDistrib=c(Max_BinomeDistrib,F.plot.bins())
+print(paste("DistribNumber ",DistribNumber ))
+}
+Max_BinomeDistrib<-Max_BinomeDistrib[order(Max_BinomeDistrib)];Max_BinomeDistrib=Max_BinomeDistrib[-1];Max_BinomeDistrib<-Max_BinomeDistrib[order(-Max_BinomeDistrib)]
+Max_BinomeDistrib95=Max_BinomeDistrib[Max_BinomeDistrib95_ThresoldRanked];Max_BinomeDistrib90=Max_BinomeDistrib[Max_BinomeDistrib90_ThresoldRanked]
+FAKEDISTRIB=FALSE
+Input<-Input.sav2
+}
+}
+Input[,5]<-Input[,5]+rep(c(0,0.0000001,0.000000001),(length(Input[,5])/3));Input[,5]<-Input[,5]/max(Input[,5])
+ads=paste("_Chr",Levels.Input[i_Chrom],sep="")
+if( max(Input[,5])>0.5){F.plot.bins()} 
+
+}
+}
+if(perChromosomeOnTheChromosome!=FALSE){
+Max_BinomeDistrib=0;Max_BinomeDistrib95=0;Max_BinomeDistrib90=0
+print(paste("TryingToParse Chromosome",perChromosomeOnTheChromosome))
+Input=Input.sav[Input.sav[,3]==perChromosomeOnTheChromosome,]
+if( max(Input[,5])>0.5){
+Input.sav2<-Input
+Total_Length=length(Input[,5])
+Selected_Genes=length(which(Input[,5]>0.5))
+if(IterationsOfBinomialDistributions>0){
+for (DistribNumber in 1:IterationsOfBinomialDistributions)
+{
+FAKEDISTRIB=TRUE
+temp<-rnorm(Total_Length);temp2<-temp[order(-temp)];temp3=temp2[Selected_Genes+1]
+
+temp[which(temp<temp3)]=0;temp[which(temp>0)]=1
+BinomDistrib<-temp
+plot(BinomDistrib)
+
+Input[,5]<-BinomDistrib
+ads=paste("FAKEDISTRIB_Number",DistribNumber)
+
+Input[,5]<-Input[,5]+rep(c(0,0.0000001,0.000000001),(length(Input[,5])/3));Input[,5]<-Input[,5]/max(Input[,5])
+Max_BinomeDistrib=c(Max_BinomeDistrib,F.plot.bins())
+print(paste("DistribNumber ",DistribNumber ))
+}
+Max_BinomeDistrib<-Max_BinomeDistrib[order(Max_BinomeDistrib)];Max_BinomeDistrib=Max_BinomeDistrib[-1];Max_BinomeDistrib<-Max_BinomeDistrib[order(-Max_BinomeDistrib)]
+Max_BinomeDistrib95=Max_BinomeDistrib[Max_BinomeDistrib95_ThresoldRanked];Max_BinomeDistrib90=Max_BinomeDistrib[Max_BinomeDistrib90_ThresoldRanked]
+FAKEDISTRIB=FALSE
+Input<-Input.sav2
+}
+}
+ads=paste(" Chr",perChromosomeOnTheChromosome,sep="")
+Input[,5]<-Input[,5]+rep(c(0,0.0000001,0.000000001),(length(Input[,5])/3));Input[,5]<-Input[,5]/max(Input[,5])
+F.plot.bins()
+}
+}
+
